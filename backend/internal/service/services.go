@@ -10,6 +10,10 @@ import (
 	"github.com/inspection-tool/backend/internal/infrastructure/storage"
 )
 
+// Package service implements application business logic. Services use
+// repository interfaces and infrastructure helpers (S3, video provider)
+// to perform higher-level operations and to record audit logs.
+
 // InspectionService handles inspection-related business logic
 type InspectionService struct {
 	inspectionRepo domain.InspectionRepository
@@ -27,7 +31,8 @@ func NewInspectionService(
 	}
 }
 
-// CreateInspection creates a new inspection
+// CreateInspection creates a new inspection and stores an audit log
+// entry for the action. It returns the newly created `domain.Inspection`.
 func (s *InspectionService) CreateInspection(ctx context.Context, user *domain.User, title, place string) (*domain.Inspection, error) {
 	inspection := &domain.Inspection{
 		InspectionID: uuid.New().String(),
@@ -65,7 +70,8 @@ func (s *InspectionService) ListInspections(ctx context.Context) ([]*domain.Insp
 	return s.inspectionRepo.ListAll(ctx)
 }
 
-// StartInspection starts an inspection (draft -> running)
+// StartInspection transitions an inspection to the running state and
+// records the start time and an audit log entry.
 func (s *InspectionService) StartInspection(ctx context.Context, user *domain.User, inspectionID string) (*domain.Inspection, error) {
 	inspection, err := s.inspectionRepo.GetByID(ctx, inspectionID)
 	if err != nil {
@@ -93,7 +99,8 @@ func (s *InspectionService) StartInspection(ctx context.Context, user *domain.Us
 	return inspection, nil
 }
 
-// EndInspection ends an inspection (running -> closed)
+// EndInspection transitions an inspection to the closed state and
+// records the end time and an audit log entry.
 func (s *InspectionService) EndInspection(ctx context.Context, user *domain.User, inspectionID string) (*domain.Inspection, error) {
 	inspection, err := s.inspectionRepo.GetByID(ctx, inspectionID)
 	if err != nil {
@@ -144,7 +151,9 @@ func NewPhotoService(
 	}
 }
 
-// GenerateUploadPresignedURL generates a presigned URL for photo upload
+// GenerateUploadPresignedURL creates a presigned upload URL for the
+// given `captureRequestID`. It validates the capture request exists and
+// constructs a deterministic S3 key for the upload.
 func (s *PhotoService) GenerateUploadPresignedURL(ctx context.Context, user *domain.User, inspectionID, captureRequestID, fileName string) (string, error) {
 	// Verify capture request exists
 	_, err := s.captureRepo.GetByID(ctx, inspectionID, captureRequestID)
@@ -164,7 +173,8 @@ func (s *PhotoService) GenerateUploadPresignedURL(ctx context.Context, user *dom
 	return url, nil
 }
 
-// CompletePhotoUpload marks a photo upload as complete
+// CompletePhotoUpload updates the capture request state, records photo
+// metadata in the photo repository, and creates an audit log entry.
 func (s *PhotoService) CompletePhotoUpload(ctx context.Context, user *domain.User, inspectionID, captureRequestID, s3Key string) (*domain.EvidencePhoto, error) {
 	// Update capture request
 	captureReq, err := s.captureRepo.GetByID(ctx, inspectionID, captureRequestID)
@@ -233,7 +243,7 @@ func NewCaptureRequestService(
 	}
 }
 
-// CreateCaptureRequest creates a new capture request
+// CreateCaptureRequest creates a new capture request and logs the action.
 func (s *CaptureRequestService) CreateCaptureRequest(ctx context.Context, user *domain.User, inspectionID string, linkedType, linkedID *string) (*domain.CaptureRequest, error) {
 	now := time.Now()
 	captureReq := &domain.CaptureRequest{
@@ -266,7 +276,7 @@ func (s *CaptureRequestService) CreateCaptureRequest(ctx context.Context, user *
 	return captureReq, nil
 }
 
-// GetCaptureRequest retrieves a capture request
+// GetCaptureRequest retrieves a capture request by ID
 func (s *CaptureRequestService) GetCaptureRequest(ctx context.Context, inspectionID, captureRequestID string) (*domain.CaptureRequest, error) {
 	return s.captureRepo.GetByID(ctx, inspectionID, captureRequestID)
 }

@@ -2,6 +2,10 @@ package domain
 
 import "context"
 
+// Repository interfaces define storage operations for domain entities.
+// Implementations (e.g., DynamoDB) should satisfy these interfaces so
+// the service layer can remain storage-agnostic.
+
 // InspectionRepository defines inspection CRUD operations
 type InspectionRepository interface {
 	Create(ctx context.Context, inspection *Inspection) error

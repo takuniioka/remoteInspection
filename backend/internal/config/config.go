@@ -1,3 +1,9 @@
+// Package config provides loading and parsing of application configuration
+// from environment variables. It defines typed structures for all
+// configuration groups (AWS, API, JWT, Cognito) and helper functions to
+// read values with sensible defaults. This module is intended to centralize
+// configuration handling so other packages can rely on a consistent source
+// of configuration values without directly accessing environment variables.
 package config
 
 import (
@@ -45,7 +51,19 @@ type CognitoConfig struct {
 	ClientSecret string
 }
 
-// LoadConfig loads configuration from environment variables
+// LoadConfig constructs a Config instance by reading environment
+// variables. Each field has a documented default which is used when the
+// corresponding environment variable is not set. The function returns a
+// pointer to the populated Config and an error only if future validation
+// is added; currently it never returns a non-nil error.
+//
+// Important environment variables (examples):
+//  - AWS_REGION: AWS region (default: ap-northeast-1)
+//  - DYNAMODB_ENDPOINT: DynamoDB endpoint (useful for DynamoDB Local)
+//  - S3_BUCKET_NAME: S3 bucket for evidence (default: inspection-evidence)
+//  - API_PORT / API_HOST: HTTP server listen port and host
+//  - JWT_SECRET / JWT_TTL: JWT signing secret and TTL in seconds
+//  - VIDEO_PROVIDER: which video provider to use ("mock" by default)
 func LoadConfig() (*Config, error) {
 	cfg := &Config{
 		AWS: AWSConfig{

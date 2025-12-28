@@ -13,22 +13,31 @@ import (
 	"github.com/inspection-tool/backend/internal/domain"
 )
 
-// DynamoDBClient wraps the DynamoDB client
+// Package repository contains concrete storage implementations for the
+// domain repository interfaces. The current implementation uses AWS
+// DynamoDB via the AWS SDK v2. These wrappers map domain models to
+// DynamoDB items and provide higher-level CRUD helpers used by the
+// service layer.
+
+// DynamoDBClient wraps the AWS SDK DynamoDB client to allow passing a
+// lightweight dependency into repository implementations.
 type DynamoDBClient struct {
 	client *dynamodb.Client
 }
 
-// NewDynamoDBClient creates a new DynamoDB client wrapper
+// NewDynamoDBClient creates a new DynamoDB client wrapper.
 func NewDynamoDBClient(client *dynamodb.Client) *DynamoDBClient {
 	return &DynamoDBClient{client: client}
 }
 
-// InspectionRepositoryImpl implements domain.InspectionRepository
+// InspectionRepositoryImpl is a DynamoDB-backed implementation of
+// `domain.InspectionRepository`.
 type InspectionRepositoryImpl struct {
 	db *DynamoDBClient
 }
 
-// NewInspectionRepository creates a new inspection repository
+// NewInspectionRepository constructs an InspectionRepository backed by
+// the provided DynamoDB client wrapper.
 func NewInspectionRepository(db *DynamoDBClient) domain.InspectionRepository {
 	return &InspectionRepositoryImpl{db: db}
 }

@@ -2,9 +2,9 @@ name: CI - Tests
 
 on:
   push:
-    branches: [ develop, main ]
+    branches: [develop, main]
   pull_request:
-    branches: [ develop, main ]
+    branches: [develop, main]
 
 jobs:
   backend-tests:
@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: "1.22"
       - name: Run Go tests
         working-directory: ./backend
         run: |
@@ -27,7 +27,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
       - name: Install dependencies
         working-directory: ./frontend
         run: |
@@ -50,7 +50,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
       - name: Install Playwright
         working-directory: ./e2e
         run: |

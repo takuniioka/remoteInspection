@@ -9,14 +9,17 @@ import (
 	"github.com/inspection-tool/backend/internal/domain"
 )
 
-// MockVideoProvider implements domain.VideoProvider for testing/local development
+// MockVideoProvider implements `domain.VideoProvider` for local
+// development and testing. It simulates stage creation, token issuance
+// and participant lists without communicating with a real streaming
+// provider. Use this in development to avoid external dependencies.
 type MockVideoProvider struct {
 	stages       map[string]*MockStage
 	tokens       map[string]*domain.VideoToken
 	participants map[string][]*domain.Participant
 }
 
-// MockStage represents a mock video stage
+// MockStage represents a lightweight in-memory stage used by the mock provider.
 type MockStage struct {
 	StageID     string
 	StageName   string
@@ -24,7 +27,7 @@ type MockStage struct {
 	Participants []*domain.Participant
 }
 
-// NewMockVideoProvider creates a new mock video provider
+// NewMockVideoProvider constructs a new mock provider instance.
 func NewMockVideoProvider() domain.VideoProvider {
 	return &MockVideoProvider{
 		stages:       make(map[string]*MockStage),
@@ -33,7 +36,8 @@ func NewMockVideoProvider() domain.VideoProvider {
 	}
 }
 
-// IssuePubToken issues a publisher token
+// IssuePubToken issues a publisher token for the given stage. The mock
+// generates random identifiers and records the token in-memory.
 func (m *MockVideoProvider) IssuePubToken(ctx context.Context, stageID string) (*domain.VideoToken, error) {
 	if _, ok := m.stages[stageID]; !ok {
 		return nil, fmt.Errorf("stage not found: %s", stageID)
@@ -49,7 +53,7 @@ func (m *MockVideoProvider) IssuePubToken(ctx context.Context, stageID string) (
 	return token, nil
 }
 
-// IssueSubToken issues a subscriber token
+// IssueSubToken issues a subscriber token; mock behavior mirrors publisher token issuance.
 func (m *MockVideoProvider) IssueSubToken(ctx context.Context, stageID string) (*domain.VideoToken, error) {
 	if _, ok := m.stages[stageID]; !ok {
 		return nil, fmt.Errorf("stage not found: %s", stageID)
@@ -65,7 +69,7 @@ func (m *MockVideoProvider) IssueSubToken(ctx context.Context, stageID string) (
 	return token, nil
 }
 
-// CreateStage creates a new mock video stage
+// CreateStage creates a mock stage and returns its generated ID.
 func (m *MockVideoProvider) CreateStage(ctx context.Context, stageName string) (string, error) {
 	stageID := uuid.New().String()
 	m.stages[stageID] = &MockStage{
@@ -78,7 +82,7 @@ func (m *MockVideoProvider) CreateStage(ctx context.Context, stageName string) (
 	return stageID, nil
 }
 
-// DeleteStage deletes a mock video stage
+// DeleteStage removes a mock stage from memory.
 func (m *MockVideoProvider) DeleteStage(ctx context.Context, stageID string) error {
 	if _, ok := m.stages[stageID]; !ok {
 		return fmt.Errorf("stage not found: %s", stageID)
@@ -88,7 +92,7 @@ func (m *MockVideoProvider) DeleteStage(ctx context.Context, stageID string) err
 	return nil
 }
 
-// ListParticipants lists all participants in a stage
+// ListParticipants returns the list of participants recorded for a stage.
 func (m *MockVideoProvider) ListParticipants(ctx context.Context, stageID string) ([]*domain.Participant, error) {
 	if _, ok := m.stages[stageID]; !ok {
 		return nil, fmt.Errorf("stage not found: %s", stageID)
@@ -96,7 +100,8 @@ func (m *MockVideoProvider) ListParticipants(ctx context.Context, stageID string
 	return m.participants[stageID], nil
 }
 
-// DisconnectParticipant disconnects a participant
+// DisconnectParticipant simulates disconnecting a participant; mock just
+// returns success.
 func (m *MockVideoProvider) DisconnectParticipant(ctx context.Context, stageID, participantID string) error {
 	if _, ok := m.stages[stageID]; !ok {
 		return fmt.Errorf("stage not found: %s", stageID)
