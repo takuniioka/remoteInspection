@@ -83,7 +83,11 @@ cd e:\新岡屋プロダクト\リモート検収＋報告書出力ツール
 
 #### 2. 環境変数設定
 
-**バックエンド** (`backend/.env`):
+**バックエンド** (環境変数):
+
+バックエンドは環境変数で設定します。リポジトリに `backend/.env` は含まれていません。
+以下はローカル開発で設定する代表的な例（`export` / PowerShell の `set` や `.env` ファイルいずれかを使用してください）。
+
 ```env
 # ローカル開発用
 AWS_REGION=ap-northeast-1
@@ -134,8 +138,22 @@ docker-compose up -d
 ```bash
 cd backend
 
-# DynamoDB Local テーブル作成
-go run ./cmd/migrate/main.go
+# NOTE: このリポジトリには `cmd/migrate` スクリプトは含まれていません。
+# DynamoDB のテーブルは次のいずれかの方法で作成してください。
+
+# 1) CDK を使ってローカルまたはクラウドへデプロイ（推奨）
+#    cd ../infra
+#    npm install
+#    # AWS 資格情報が設定されている場合は実環境へ、ローカル検証は --profile や環境変数で制御
+#    cdk deploy
+
+# 2) DynamoDB Local に対して手動でテーブルを作成（AWS CLI）
+#    例: Inspections テーブルを作る場合の一例（他のテーブル定義は infra/lib/inspection-stack.ts を参照）
+#    aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name Inspections \
+#      --attribute-definitions AttributeName=inspectionId,AttributeType=S \
+#      --key-schema AttributeName=inspectionId,KeyType=HASH --billing-mode PAY_PER_REQUEST
+
+# 3) テストや開発用に、アプリ側で必要なテーブルを動的に作るスクリプトを書いて実行する
 
 # REST API サーバ起動
 go run ./cmd/api/main.go
@@ -446,11 +464,11 @@ log.SetLevel("DEBUG")
 ├── docker-compose.yaml (ローカル開発)
 ├── backend/
 │   ├── go.mod / go.sum
-│   ├── .env
+│   ├── (environment variables are set via OS or .env not included)
 │   ├── cmd/
 │   │   ├── api/main.go (REST API Lambda)
 │   │   ├── ws/main.go (WebSocket Lambda)
-│   │   └── migrate/main.go (DB 初期化)
+│   │   └── (no migrate script included)
 │   ├── internal/
 │   │   ├── domain/ (Entity definitions)
 │   │   ├── service/ (Business logic)

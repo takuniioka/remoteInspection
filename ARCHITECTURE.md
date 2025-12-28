@@ -11,14 +11,13 @@
 ├── backend/                       # Go backend application
 │   ├── go.mod                     # Go module definition
 │   ├── go.sum                     # Go dependency checksums
-│   ├── .env                       # Environment variables for local development
+│   ├── (environment variables are set via OS or .env not included)
 │   ├── cmd/
 │   │   ├── api/
 │   │   │   └── main.go            # REST API server (Lambda-ready)
 │   │   ├── ws/
 │   │   │   └── main.go            # WebSocket server (Lambda-ready)
-│   │   └── migrate/
-│   │       └── main.go            # Database migration script (TODO)
+│   │   └── (no migrate script included)
 │   │
 │   └── internal/
 │       ├── config/
@@ -191,6 +190,8 @@
 - [ ] PDF report generation
 - [ ] Unit tests and integration tests
 - [ ] E2E testing setup
+- [x] Unit tests and integration tests (backend + frontend unit tests added)
+- [x] E2E testing setup (Playwright skeleton added under `e2e/`)
 - [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Monitoring and alerting (CloudWatch)
 - [ ] More template types and customization

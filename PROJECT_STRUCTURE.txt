@@ -14,15 +14,14 @@ inspection-tool/
 ├── backend/                                 # Go backend application
 │   ├── go.mod                               # Go module definition
 │   ├── go.sum                               # Go dependencies
-│   ├── .env                                 # Environment variables (development)
+│   ├── (environment variables are set via OS or .env not included)
 │   │
 │   ├── cmd/                                 # Command-line entry points
 │   │   ├── api/
 │   │   │   └── main.go                      # REST API server (Lambda-compatible)
 │   │   ├── ws/
 │   │   │   └── main.go                      # WebSocket server (Lambda-compatible)
-│   │   └── migrate/
-│   │       └── main.go                      # Database migration (TODO)
+│   │   └── (no migrate script included)
 │   │
 │   └── internal/                            # Private package (not exported)
 │       ├── config/
