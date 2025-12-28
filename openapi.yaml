@@ -1,0 +1,1070 @@
+openapi: 3.0.0
+info:
+  title: Remote Inspection Capture Tool API
+  version: "1.0.0"
+  description: |
+    高速リモート検収ツール REST API
+    認可は HTTP 401/403 で実装
+    全レスポンスは code/message/data を含む統一フォーマット
+
+servers:
+  - url: /api
+    description: API Gateway HTTP API
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: "INVALID_REQUEST"
+        message:
+          type: string
+        details:
+          type: object
+
+    SuccessResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: string
+          example: "SUCCESS"
+        message:
+          type: string
+        data:
+          type: object
+
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [viewer, capturer, editor, admin]
+        createdAt:
+          type: string
+          format: date-time
+
+    Inspection:
+      type: object
+      properties:
+        inspectionId:
+          type: string
+        title:
+          type: string
+        place:
+          type: string
+        status:
+          type: string
+          enum: [draft, running, closed]
+        realtimeRef:
+          type: string
+          description: "IVS Stage ID or other video provider reference"
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          type: string
+
+    ChecklistItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+        inspectionId:
+          type: string
+        label:
+          type: string
+        result:
+          type: string
+          enum: [ok, ng, pending]
+        comment:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+
+    Issue:
+      type: object
+      properties:
+        issueId:
+          type: string
+        inspectionId:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, closed]
+        assignee:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+
+    CaptureRequest:
+      type: object
+      properties:
+        inspectionId:
+          type: string
+        captureRequestId:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: string
+        state:
+          type: string
+          enum: [requested, capturing, uploaded, failed, timeout]
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+        uploadedAt:
+          type: string
+          format: date-time
+          nullable: true
+        photoId:
+          type: string
+          nullable: true
+        linkedType:
+          type: string
+          enum: [checklistItem, issue]
+          nullable: true
+        linkedId:
+          type: string
+          nullable: true
+        failReason:
+          type: string
+          nullable: true
+
+    EvidencePhoto:
+      type: object
+      properties:
+        inspectionId:
+          type: string
+        photoId:
+          type: string
+        captureRequestId:
+          type: string
+          nullable: true
+        s3OriginalKey:
+          type: string
+        s3AnnotatedKey:
+          type: string
+          nullable: true
+        s3AnnotationJsonKey:
+          type: string
+          nullable: true
+        capturedAt:
+          type: string
+          format: date-time
+        uploadedAt:
+          type: string
+          format: date-time
+        annotatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        linkedType:
+          type: string
+          enum: [checklistItem, issue]
+          nullable: true
+        linkedId:
+          type: string
+          nullable: true
+        note:
+          type: string
+
+    AnnotationTemplate:
+      type: object
+      properties:
+        templateId:
+          type: string
+        version:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        definitionJson:
+          type: object
+          description: "Konva object definition"
+        createdAt:
+          type: string
+          format: date-time
+
+    ViewerLink:
+      type: object
+      properties:
+        viewerAccessToken:
+          type: string
+        inspectionId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        isRevoked:
+          type: boolean
+        maxUses:
+          type: integer
+          nullable: true
+        usedCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+
+    GuestSessionToken:
+      type: object
+      properties:
+        guestSessionToken:
+          type: string
+        expiresIn:
+          type: integer
+          description: "Expiry time in seconds"
+
+    VideoToken:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        participantId:
+          type: string
+
+    PresignedURLResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        expires:
+          type: integer
+          description: "Expiry time in seconds"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    UnauthorizedError:
+      description: "認証なし or トークン無効"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ForbiddenError:
+      description: "権限不足"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+paths:
+  /me:
+    get:
+      tags: [Auth]
+      summary: "ログインユーザー情報"
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /inspections:
+    post:
+      tags: [Inspections]
+      summary: "新規案件作成"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, place]
+              properties:
+                title:
+                  type: string
+                place:
+                  type: string
+      responses:
+        "201":
+          description: "作成成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Inspection"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /inspections/{inspectionId}:
+    get:
+      tags: [Inspections]
+      summary: "案件詳細取得"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Inspection"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: "案件なし"
+
+  /inspections/{inspectionId}/start:
+    post:
+      tags: [Inspections]
+      summary: "案件開始"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Inspection"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/end:
+    post:
+      tags: [Inspections]
+      summary: "案件終了"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Inspection"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/checklist:
+    get:
+      tags: [Checklist]
+      summary: "チェックリスト一覧"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ChecklistItem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /inspections/{inspectionId}/checklist/{itemId}:
+    patch:
+      tags: [Checklist]
+      summary: "チェック項目更新"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                result:
+                  type: string
+                  enum: [ok, ng, pending]
+                comment:
+                  type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/ChecklistItem"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/issues:
+    get:
+      tags: [Issues]
+      summary: "Issue 一覧"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Issue"
+    post:
+      tags: [Issues]
+      summary: "Issue 作成"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, detail]
+              properties:
+                title:
+                  type: string
+                detail:
+                  type: string
+                linkedType:
+                  type: string
+                  enum: [checklistItem, issue]
+                linkedId:
+                  type: string
+      responses:
+        "201":
+          description: "作成成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Issue"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/issues/{issueId}:
+    patch:
+      tags: [Issues]
+      summary: "Issue 更新"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: issueId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [open, resolved, closed]
+                assignee:
+                  type: string
+                detail:
+                  type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Issue"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/realtime/token:
+    post:
+      tags: [Video]
+      summary: "リアルタイム配信 token 発行"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/VideoToken"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/capture-requests:
+    post:
+      tags: [Capture]
+      summary: "撮影要求発行"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                linkedType:
+                  type: string
+                  enum: [checklistItem, issue]
+                linkedId:
+                  type: string
+      responses:
+        "201":
+          description: "要求作成"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/CaptureRequest"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/photos/presign:
+    post:
+      tags: [Photos]
+      summary: "写真アップロード用 presigned URL 生成"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [captureRequestId, fileName, contentType]
+              properties:
+                captureRequestId:
+                  type: string
+                fileName:
+                  type: string
+                contentType:
+                  type: string
+                  example: "image/jpeg"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/PresignedURLResponse"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/photos/{photoId}/complete:
+    post:
+      tags: [Photos]
+      summary: "写真アップロード完了通知"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [captureRequestId]
+              properties:
+                captureRequestId:
+                  type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/EvidencePhoto"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/photos/{photoId}/annotation/presign:
+    post:
+      tags: [Annotation]
+      summary: "注釈付き画像アップロード用 presigned URL 生成"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileName, contentType]
+              properties:
+                fileName:
+                  type: string
+                contentType:
+                  type: string
+                  example: "image/png"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/PresignedURLResponse"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/photos/{photoId}/annotation/complete:
+    post:
+      tags: [Annotation]
+      summary: "注釈完了通知 (Annotation JSON + 画像)"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [s3AnnotatedKey, annotationJson]
+              properties:
+                s3AnnotatedKey:
+                  type: string
+                annotationJson:
+                  type: object
+                  description: "Serialized Konva objects"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/EvidencePhoto"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /annotation-templates:
+    get:
+      tags: [Templates]
+      summary: "テンプレ一覧取得 (Active のみ)"
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AnnotationTemplate"
+    post:
+      tags: [Templates]
+      summary: "テンプレ新規作成"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, definitionJson]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                definitionJson:
+                  type: object
+      responses:
+        "201":
+          description: "作成成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/AnnotationTemplate"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /annotation-templates/{templateId}:
+    put:
+      tags: [Templates]
+      summary: "テンプレ更新"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                definitionJson:
+                  type: object
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/AnnotationTemplate"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /inspections/{inspectionId}/viewer-links:
+    post:
+      tags: [Viewer Links]
+      summary: "ゲスト閲覧リンク発行"
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresInDays:
+                  type: integer
+                  default: 7
+                maxUses:
+                  type: integer
+                  nullable: true
+      responses:
+        "201":
+          description: "リンク生成"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/ViewerLink"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /public/viewer-sessions:
+    post:
+      tags: [Public]
+      summary: "ゲスト session token 発行 (ログイン不要)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [viewerAccessToken]
+              properties:
+                viewerAccessToken:
+                  type: string
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/GuestSessionToken"
+        "400":
+          description: "Invalid or expired token"
+        "404":
+          description: "Token not found"
+
+  /public/inspections/{inspectionId}:
+    get:
+      tags: [Public]
+      summary: "案件詳細閲覧 (ゲスト)"
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Inspection"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+
+  /public/inspections/{inspectionId}/photos:
+    get:
+      tags: [Public]
+      summary: "証跡写真一覧 (ゲスト)"
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/EvidencePhoto"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"

@@ -1,0 +1,222 @@
+あなたはシニアのフルスタックエンジニアです。以下の要件に基づき、MVPとして動作する「遠隔検収ツール」を設計・実装してください。
+最優先は“導入のしやすさ（ブラウザのみ）”と“リモートシャッターで現場が高画質撮影→自動紐付け”です。
+
+# 0. 重要なアウトプット形式
+- 生成物は「モノレポ（単一リポジトリ）」として、ファイルパス付きで提示してください。
+- 出力は以下の順で：
+  1) ルートのREADME（セットアップ手順、ローカル起動、デプロイ手順の概要）
+  2) リポジトリのディレクトリツリー
+  3) 主要ファイルの内容（全てのソースファイル）
+- バイナリは不要。設定やコードのみ。
+- OpenAPI（openapi.yaml）と WebSocket message schema（JSON Schema）を必ず含める。
+
+# 1. システム概要
+現場（ブラウザ）でカメラ映像を配信し、リモート（最大5人）が 1秒未満（サブセカンド狙い）で視聴しながら検収を行う。
+録画は不要。場面ごとに証跡写真を残す。
+リモート側がシャッターを押すと、現場端末が高画質写真を撮影してS3へアップロードし、captureRequestIdで自動的に証跡として紐付ける。
+証跡写真に注釈（お絵かき、図形、テキスト、看板テンプレ）を重ねて画像に焼き込み保存できる。
+報告書PDFを生成できる。
+ログイン機能あり（権限で機能制御）。
+viewerのみの場合はログイン不要orワンクリックで閲覧画面に入れる（ゲスト閲覧リンク）。
+
+# 2. 技術スタック（指定）
+## フロント
+- React + TypeScript（Vite）
+- UIライブラリはMUIでもTailwindでもよいが、整合性を保つこと
+- 注釈Canvas：Konva.js もしくは Fabric.js のどちらかで実装（推奨：Konva）
+
+## バックエンド
+- Go（1.22+）
+- REST API：API Gateway HTTP API + AWS Lambda（Go）前提で書く（ローカルでも動く構成）
+- WebSocket：API Gateway WebSocket + Lambda（Go）前提で書く
+- DB：DynamoDB
+- ファイル：S3（presigned URL でアップロード）
+- 認証：Cognito（ログインユーザー）
+- ゲスト閲覧：viewer招待リンク（署名トークン）でログイン不要の閲覧セッション
+
+## インフラ（IaC）
+- AWS CDK（TypeScript）または Terraform のどちらかで用意（推奨：CDK TypeScript）
+- ただし実装の本体はアプリ（フロント/バック）で、IaCはMVP範囲で最低限（DynamoDB/S3/API/WS/Cognito）を作れるところまで
+
+## 動画/WebRTC
+- Amazon IVS Real-Time（Stage）想定（Publish/Subscribe token発行）
+- ただし、実環境の準備が難しい場合でもMVPが動くように、バックエンド側は「VideoProviderインターフェース」を定義し、
+  - 実装A：IVS Real-Time用（本番）
+  - 実装B：モック（ローカル）
+  の2つを用意すること。
+フロントは実装Aを想定した構造で、モック時は「動画枠にダミー表示」で良い。
+
+# 3. ロール/権限（必須）
+- viewer：閲覧のみ
+- capturer：撮影可能（リモートシャッター要求、写真アップロード）
+- editor：注釈編集可能（お絵かき/看板テンプレ編集、注釈付き保存）
+- admin：テンプレ管理、ユーザー管理、案件テンプレ管理
+加えて、ゲスト閲覧：
+- guestViewer：招待リンク経由（ログイン不要）で閲覧のみ
+
+認可は必ずサーバ側で強制。UIだけで制御しない。
+
+# 4. 機能要件（Must）
+## 4.1 検収案件
+- 案件作成、開始、終了、参照
+- チェックリスト：OK/NG/保留 + コメント + 更新履歴
+- 指摘（Issue）：作成、更新（ステータス/担当/コメント）
+
+## 4.2 リモートシャッター → 現場高画質撮影 → 自動紐付け
+- captureRequestIdをサーバで採番
+- 状態遷移：Requested -> Capturing -> Uploaded（失敗：Failed/Timeout）
+- requestedAt/capturedAt/uploadedAt を保存
+- WebSocketイベントで現場へ通知し、完了を全員にブロードキャスト
+- タイムアウト（例：5秒）を実装し、再要求可能
+
+現場ブラウザで高画質撮影の実装方針：
+- 優先：ImageCapture APIで MediaStreamTrack から静止画撮影（対応時）
+- フォールバック：遠隔要求を受けたら「撮影ダイアログ（1タップ撮影）」を表示して <input capture> で撮影→アップロード
+  ※完全自動で撮れない場合でも、遠隔要求により“現場でワンタップ”まで誘導すること（要件の落とし所）
+
+## 4.3 写真管理
+- S3へ原本画像アップロード（presigned URL）
+- サムネ生成（Lambdaで後処理でも、フロントで生成でも可。MVPはフロント生成でもよい）
+- 写真一覧、チェック項目/Issueへの紐付け、タイムライン表示
+
+## 4.4 注釈（お絵かき/図形/テキスト）＋ 画像内ラベル
+- フリーハンド、矩形、円、線、矢印、テキスト
+- オブジェクトの移動/拡縮/回転
+- Undo/Redo（簡易でも良い）
+- 保存時は「注釈付き画像（Annotated）」を生成してS3へ保存
+
+## 4.5 看板テンプレ（定型フォーマット図形）
+- 事前定義テンプレを選んでCanvas上に配置できる（看板風）
+- 入力項目：タイトル、場所、日時、担当者、備考
+- その場で編集可能（再編集も可能）
+- 位置調整（移動/拡縮/回転）可能
+- 保存時に注釈付き画像へ焼き込み
+
+テンプレは admin がCRUDできる（MVPは1テンプレ固定でも良いが、CRUDの器は作る）
+
+## 4.6 ログイン（Cognito）＋ viewerのログイン不要導線
+- ログインユーザー向け：Cognitoでログイン（JWT）
+- viewerのみ（ゲスト）向け：
+  - admin/editor/capturer が「閲覧リンク」を発行（推測困難トークン、期限、失効可能）
+  - viewer はそのURLを開くだけで閲覧画面へ（ログイン不要/ワンクリック）
+  - public endpointで viewerAccessToken を渡すと、guest session token（短期）を返す
+  - guest session で閲覧系APIと視聴用トークン発行ができる
+
+## 4.7 報告書
+- MVP：まずHTML生成 + S3保存（閲覧可能）でもよい
+- 可能なら：PDF生成（ヘッドレスChrome等）
+  - ただし難易度が高い場合、PDFは後回しでもOK。その場合はTODOと設計だけは残す
+
+# 5. 非機能要件（MVPで最低限）
+- セキュリティ：認証/認可はサーバで強制、presigned URLでアップロード、招待リンクに期限/失効
+- 監査ログ：案件参加、シャッター要求、アップロード、注釈保存を最低限ログ化
+- 拡張性：フロント/バック分離、VideoProvider等の境界を持つ
+- マルチテナントは将来対応の余地（MVPは単一テナントでOK）
+
+# 6. データモデル（DynamoDB：MVPのテーブル設計）
+複数テーブルでも単一テーブルでも良いが、MVPは分かりやすさ優先で複数テーブルでOK。
+
+必須エンティティ：
+- Inspections：inspectionId, title, place, status, createdAt, startedAt, endedAt, realtimeRef
+- ChecklistItems：inspectionId + itemId, label, result, comment, updatedAt, updatedBy
+- Issues：inspectionId + issueId, title, detail, status, assignee, createdAt, updatedAt
+- CaptureRequests：inspectionId + captureRequestId, requestedAt, requestedBy, state, capturedAt, uploadedAt, photoId, linkedType/linkedId, failReason
+- EvidencePhotos：inspectionId + photoId, captureRequestId, s3OriginalKey, s3AnnotatedKey, s3AnnotationJsonKey, requestedAt/capturedAt/uploadedAt, annotatedAt, linkedType/linkedId, note
+- AnnotationTemplates：templateId + version, name, isActive, definitionJson, createdAt
+- ViewerLinks：viewerAccessToken(PK), inspectionId, expiresAt, isRevoked, maxUses, usedCount, createdAt, createdBy
+
+# 7. API（OpenAPIで定義し、Goで実装）
+必須エンドポイント（例）：
+- GET /me（ログインユーザー）
+- POST /inspections
+- GET /inspections/{inspectionId}
+- POST /inspections/{inspectionId}/start
+- POST /inspections/{inspectionId}/end
+- GET /inspections/{inspectionId}/checklist
+- PATCH /inspections/{inspectionId}/checklist/{itemId}
+- GET /inspections/{inspectionId}/issues
+- POST /inspections/{inspectionId}/issues
+- PATCH /inspections/{inspectionId}/issues/{issueId}
+- POST /inspections/{inspectionId}/realtime/token（VideoProvider token）
+- POST /inspections/{inspectionId}/capture-requests（capturer+）
+- POST /inspections/{inspectionId}/photos/presign（capturer+）
+- POST /inspections/{inspectionId}/photos/{photoId}/complete（capturer+）
+- POST /inspections/{inspectionId}/photos/{photoId}/annotation/presign（editor+）
+- POST /inspections/{inspectionId}/photos/{photoId}/annotation/complete（editor+）
+- GET /annotation-templates
+- POST /annotation-templates（admin）
+- PUT /annotation-templates/{templateId}（admin）
+- POST /inspections/{inspectionId}/viewer-links（admin/editor/capturer）
+- POST /public/viewer-sessions（viewerAccessToken→guestSessionToken）
+- GET /public/inspections/{inspectionId}（guest）
+- GET /public/inspections/{inspectionId}/photos（guest）
+
+# 8. WebSocket（JSON Schemaで定義し、Goで実装）
+ルーム概念：inspectionId単位にブロードキャスト
+
+イベント：
+- capture.request（remote→field）
+- capture.ack（field→all）
+- capture.uploaded（field→all）
+- capture.failed（field→all）
+- checklist.updated（any→all）
+- issue.updated（any→all）
+- photo.annotation.updated（editor→all）
+
+# 9. フロント画面（最低限）
+- /login（ログインユーザー向け）
+- /inspections/:id/remote（リモート検収画面）
+- /inspections/:id/field（現場配信/撮影画面）
+- /inspections/:id/view（ゲスト閲覧画面：招待リンクから）
+- /photos/:photoId/annotate（注釈編集）
+- /admin/templates（看板テンプレ管理：簡易）
+
+リモート検収画面：
+- 動画枠 + チェックリスト + Issues + 証跡タイムライン
+- capturer以上のみシャッターボタン表示
+- editor以上のみ注釈編集ボタン表示
+
+現場画面：
+- カメラプレビュー + 配信開始/停止 + 遠隔シャッター受付トグル
+- 遠隔要求受信→撮影→アップロード→完了
+
+注釈画面：
+- 背景（Original） + Canvas
+- ツール（ペン/図形/テキスト/看板）
+- 看板はテンプレ選択→配置→サイドパネルでタイトル/場所/日時/担当者/備考入力→保存
+- 保存で Annotated画像＋Annotation JSON をS3へアップロードしてcomplete
+
+# 10. ローカル開発
+- docker-composeで dynamodb-local を立てる
+- S3は localstack でも minio でも良い（簡略化ならS3は実AWSでも可）
+- バックエンドは環境変数でローカル/本番切替
+- フロントは .env で API_BASE_URL / WS_URL を切替
+
+# 11. 受入基準（必須）
+- guestViewerはログイン無しで招待リンクを開くだけで閲覧できる（ワンクリック）
+- guestViewer/viewerは撮影・注釈編集ができない（UI非表示 + API拒否）
+- capturerでリモートシャッター→現場側が高画質（またはワンタップ）撮影→S3→証跡反映が動く
+- captureRequestIdで requestedAt/capturedAt/uploadedAt が保存され、状態遷移が追える
+- editorで注釈（お絵かき/看板）を保存すると Annotated画像が生成され、証跡として閲覧できる
+- 看板テンプレにタイトル/場所/日時/担当者/備考を入力でき、位置調整して保存できる
+
+# 12. 実装の指示（品質）
+- 型定義を統一する：OpenAPIからフロント用型を生成するか、共通schemaから生成するか、いずれかを採用
+- Goはレイヤを分ける：handler / service / repository / domain / middleware
+- 認可はmiddlewareで統一的に実装
+- エラーレスポンス形式を統一（code/message/details）
+- ログは構造化（JSON）で出す
+- 可能な範囲でユニットテスト（Go）と最低限のE2E手順（README）を用意
+
+# 13. まず作るMVP範囲（優先順）
+1) 認証（ログイン）と権限（viewer/capturer/editor/admin）
+2) viewer招待リンク（guestViewer）導線
+3) 検収案件/チェック/Issue CRUD
+4) WebSocket基盤（inspectionIdルーム）＋capture.request/ uploaded
+5) 写真アップロード（presign/complete）＋証跡一覧
+6) 注釈（ペン/図形/テキスト）→ Annotated生成・保存
+7) 看板テンプレ（最低1種）→ 入力・配置・保存
+8) 報告書（まずHTML→S3、PDFは設計+TODO）
+
+この指示に従い、モノレポ一式を生成してください。
+不足があれば「MVPに必要な合理的な仮定」を置いて実装し、READMEに明記してください（質問で止めない）。

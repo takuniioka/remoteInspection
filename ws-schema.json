@@ -1,0 +1,341 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WebSocket Message Schema",
+    "description": "Remote Inspection Capture Tool WebSocket messages",
+    "oneOf": [
+        {
+            "title": "capture.request",
+            "description": "リモート側がシャッター要求を発行",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "requestedBy"
+            ],
+            "properties": {
+                "type": {
+                    "const": "capture.request"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "requestedBy": {
+                    "type": "string",
+                    "description": "userId of requester"
+                },
+                "linkedType": {
+                    "type": "string",
+                    "enum": [
+                        "checklistItem",
+                        "issue"
+                    ],
+                    "description": "Optional link to checklist or issue"
+                },
+                "linkedId": {
+                    "type": "string",
+                    "description": "itemId or issueId"
+                }
+            }
+        },
+        {
+            "title": "capture.ack",
+            "description": "バックエンドが要求を受理 (state=requested)",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "captureRequestId",
+                "state"
+            ],
+            "properties": {
+                "type": {
+                    "const": "capture.ack"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "captureRequestId": {
+                    "type": "string"
+                },
+                "requestedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "requestedBy": {
+                    "type": "string"
+                },
+                "state": {
+                    "const": "requested"
+                }
+            }
+        },
+        {
+            "title": "capture.uploaded",
+            "description": "現場がアップロード完了 (state=uploaded, photoId 割り当て)",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "captureRequestId",
+                "photoId",
+                "state"
+            ],
+            "properties": {
+                "type": {
+                    "const": "capture.uploaded"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "captureRequestId": {
+                    "type": "string"
+                },
+                "photoId": {
+                    "type": "string",
+                    "description": "newly assigned photo ID"
+                },
+                "uploadedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "state": {
+                    "const": "uploaded"
+                },
+                "linkedType": {
+                    "type": "string",
+                    "enum": [
+                        "checklistItem",
+                        "issue"
+                    ]
+                },
+                "linkedId": {
+                    "type": "string"
+                }
+            }
+        },
+        {
+            "title": "capture.failed",
+            "description": "撮影・アップロード失敗",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "captureRequestId",
+                "state"
+            ],
+            "properties": {
+                "type": {
+                    "const": "capture.failed"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "captureRequestId": {
+                    "type": "string"
+                },
+                "state": {
+                    "const": "failed"
+                },
+                "failReason": {
+                    "type": "string",
+                    "example": "User declined camera access"
+                }
+            }
+        },
+        {
+            "title": "capture.timeout",
+            "description": "タイムアウト (5秒以内に captured/failed が来ない)",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "captureRequestId",
+                "state"
+            ],
+            "properties": {
+                "type": {
+                    "const": "capture.timeout"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "captureRequestId": {
+                    "type": "string"
+                },
+                "state": {
+                    "const": "timeout"
+                }
+            }
+        },
+        {
+            "title": "checklist.updated",
+            "description": "チェックリスト項目が更新",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "itemId"
+            ],
+            "properties": {
+                "type": {
+                    "const": "checklist.updated"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "itemId": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "result": {
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "ng",
+                        "pending"
+                    ]
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "updatedBy": {
+                    "type": "string"
+                }
+            }
+        },
+        {
+            "title": "issue.updated",
+            "description": "Issue が作成・更新",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "issueId"
+            ],
+            "properties": {
+                "type": {
+                    "const": "issue.updated"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "issueId": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "resolved",
+                        "closed"
+                    ]
+                },
+                "assignee": {
+                    "type": "string",
+                    "nullable": true
+                },
+                "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "updatedBy": {
+                    "type": "string"
+                }
+            }
+        },
+        {
+            "title": "photo.annotation.updated",
+            "description": "写真に注釈が追加・更新",
+            "type": "object",
+            "required": [
+                "type",
+                "inspectionId",
+                "photoId"
+            ],
+            "properties": {
+                "type": {
+                    "const": "photo.annotation.updated"
+                },
+                "inspectionId": {
+                    "type": "string"
+                },
+                "photoId": {
+                    "type": "string"
+                },
+                "s3AnnotatedKey": {
+                    "type": "string",
+                    "description": "S3 key of annotated image"
+                },
+                "annotatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "updatedBy": {
+                    "type": "string"
+                }
+            }
+        },
+        {
+            "title": "connection.established",
+            "description": "WebSocket 接続確立時にサーバから送信",
+            "type": "object",
+            "required": [
+                "type",
+                "connectionId"
+            ],
+            "properties": {
+                "type": {
+                    "const": "connection.established"
+                },
+                "connectionId": {
+                    "type": "string"
+                },
+                "serverTime": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
+        {
+            "title": "error",
+            "description": "エラーメッセージ",
+            "type": "object",
+            "required": [
+                "type",
+                "code",
+                "message"
+            ],
+            "properties": {
+                "type": {
+                    "const": "error"
+                },
+                "code": {
+                    "type": "string",
+                    "example": "INVALID_REQUEST"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "object"
+                }
+            }
+        }
+    ]
+}
