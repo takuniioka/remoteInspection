@@ -10,6 +10,11 @@ import (
 	"github.com/inspection-tool/backend/internal/domain"
 )
 
+// This test file contains unit tests for service layer logic along with
+// simple in-memory mock implementations of repository interfaces. The
+// mocks are intentionally lightweight and synchronous to make tests
+// deterministic and fast.
+
 // MockInspectionRepository for testing
 type MockInspectionRepository struct {
 	inspections map[string]*domain.Inspection

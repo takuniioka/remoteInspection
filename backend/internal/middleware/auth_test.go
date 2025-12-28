@@ -12,6 +12,10 @@ import (
 	"github.com/inspection-tool/backend/internal/domain"
 )
 
+// Unit tests for authentication middleware. These tests exercise the
+// JWT parsing, claim extraction and role-based authorization helper
+// middleware. The tests use a simple HS256-signed token with
+// `testSecret`.
 const testSecret = "test-secret-key"
 
 // Helper to create a test JWT token
