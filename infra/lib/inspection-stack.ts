@@ -6,6 +6,13 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import { Construct } from 'constructs'
 
+/**
+ * CDK stack defining infrastructure for the inspection tool. It
+ * provisions DynamoDB tables, S3 buckets for evidence and UI hosting,
+ * a CloudFront distribution for the UI and a Cognito user pool for
+ * authentication. The resources use `RemovalPolicy.DESTROY` to simplify
+ * development teardown; change to RETAIN for production.
+ */
 export class InspectionToolStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props)

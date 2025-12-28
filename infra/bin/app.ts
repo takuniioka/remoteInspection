@@ -1,3 +1,6 @@
+// CDK app entrypoint used to synthesize the stack locally. It reads
+// environment variables for account/region to allow `cdk deploy` when
+// configured; defaults to `ap-northeast-1` for convenience.
 import * as cdk from 'aws-cdk-lib'
 import { InspectionToolStack } from './lib/inspection-stack'
 
