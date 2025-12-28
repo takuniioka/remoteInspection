@@ -344,6 +344,11 @@ jobs:
       - run: cd e2e && npm install && npm test
 ```
 
+※ リポジトリには CI ワークフローのサンプルを追加しています: `.github/workflows/ci-tests.yml`。
+  - `backend-tests`: Go ユニットテストを実行
+  - `frontend-tests`: Vitest を使ったフロントのユニットテスト + カバレッジ
+  - `e2e-tests`: Playwright を使った E2E（必要に応じて有効化）
+
 ## トラブルシューティング
 
 ### Go テストが失敗する場合

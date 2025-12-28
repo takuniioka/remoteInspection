@@ -162,6 +162,50 @@ go run ./cmd/api/main.go
 go run ./cmd/ws/main.go
 ```
 
+#### DynamoDB Local: 主要テーブルの作成例（AWS CLI）
+
+以下は `docker-compose up -d` で DynamoDB Local を起動した後に実行できるサンプルコマンドです。テーブル定義は `infra/lib/inspection-stack.ts` を参照しています。
+
+```bash
+# Inspections
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name Inspections \
+  --attribute-definitions AttributeName=inspectionId,AttributeType=S \
+  --key-schema AttributeName=inspectionId,KeyType=HASH --billing-mode PAY_PER_REQUEST
+
+# ChecklistItems (partitionKey=inspectionId, sortKey=itemId)
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name ChecklistItems \
+  --attribute-definitions AttributeName=inspectionId,AttributeType=S AttributeName=itemId,AttributeType=S \
+  --key-schema AttributeName=inspectionId,KeyType=HASH AttributeName=itemId,KeyType=RANGE --billing-mode PAY_PER_REQUEST
+
+# Issues (partitionKey=inspectionId, sortKey=issueId)
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name Issues \
+  --attribute-definitions AttributeName=inspectionId,AttributeType=S AttributeName=issueId,AttributeType=S \
+  --key-schema AttributeName=inspectionId,KeyType=HASH AttributeName=issueId,KeyType=RANGE --billing-mode PAY_PER_REQUEST
+
+# CaptureRequests (partitionKey=inspectionId, sortKey=captureRequestId)
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name CaptureRequests \
+  --attribute-definitions AttributeName=inspectionId,AttributeType=S AttributeName=captureRequestId,AttributeType=S \
+  --key-schema AttributeName=inspectionId,KeyType=HASH AttributeName=captureRequestId,KeyType=RANGE --billing-mode PAY_PER_REQUEST
+
+# EvidencePhotos (partitionKey=inspectionId, sortKey=photoId)
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name EvidencePhotos \
+  --attribute-definitions AttributeName=inspectionId,AttributeType=S AttributeName=photoId,AttributeType=S \
+  --key-schema AttributeName=inspectionId,KeyType=HASH AttributeName=photoId,KeyType=RANGE --billing-mode PAY_PER_REQUEST
+
+# AnnotationTemplates (partitionKey=templateId, sortKey=version (Number))
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name AnnotationTemplates \
+  --attribute-definitions AttributeName=templateId,AttributeType=S AttributeName=version,AttributeType=N \
+  --key-schema AttributeName=templateId,KeyType=HASH AttributeName=version,KeyType=RANGE --billing-mode PAY_PER_REQUEST
+
+# ViewerLinks (partitionKey=viewerAccessToken) with TTL attribute 'expiresAt' (Number)
+aws dynamodb create-table --endpoint-url http://localhost:8000 --table-name ViewerLinks \
+  --attribute-definitions AttributeName=viewerAccessToken,AttributeType=S \
+  --key-schema AttributeName=viewerAccessToken,KeyType=HASH --billing-mode PAY_PER_REQUEST
+
+# (Optional) Enable TTL on ViewerLinks
+aws dynamodb update-time-to-live --endpoint-url http://localhost:8000 --table-name ViewerLinks --time-to-live-specification Enabled=true,AttributeName=expiresAt
+```
+
 #### 5. フロント起動
 
 ```bash
@@ -479,7 +523,6 @@ log.SetLevel("DEBUG")
 │   └── tests/
 ├── frontend/
 │   ├── package.json / package-lock.json
-│   ├── .env
 │   ├── vite.config.ts
 │   ├── tsconfig.json
 │   ├── index.html
