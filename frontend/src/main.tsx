@@ -1,3 +1,5 @@
+// Entry point for the frontend application. Sets up MUI theme and
+// renders the top-level `App` component into the DOM.
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
 import React from 'react'
 import ReactDOM from 'react-dom/client'

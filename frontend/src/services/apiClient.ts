@@ -1,3 +1,11 @@
+/**
+ * API client wrapper
+ *
+ * This module provides a small wrapper around `axios` that centralizes
+ * API requests, handles the JSON envelope used by the backend (`ApiResponse`),
+ * and injects an Authorization header when a token is set.
+ */
+
 import {
     AnnotationTemplate,
     ApiErrorResponse,
@@ -22,6 +30,10 @@ class ApiClient {
     private client: AxiosInstance
     private token: string | null = null
 
+    /**
+     * Create a new ApiClient.
+     * @param baseURL base URL for API requests (e.g., VITE_API_BASE_URL)
+     */
     constructor(baseURL: string) {
         this.client = axios.create({
             baseURL,
@@ -40,14 +52,20 @@ class ApiClient {
         })
     }
 
+    /** Set the bearer token used for authenticated requests. */
     setToken(token: string) {
         this.token = token
     }
 
+    /** Clear the stored authentication token. */
     clearToken() {
         this.token = null
     }
 
+    /**
+     * Internal request helper that unwraps the backend's `ApiResponse` envelope
+     * and throws a JavaScript Error with the backend message on failure.
+     */
     private async request<T>(
         method: string,
         url: string,

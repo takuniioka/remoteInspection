@@ -1,3 +1,12 @@
+/**
+ * WebSocket client helper
+ *
+ * Provides a thin wrapper around the browser `WebSocket` that supports
+ * automatic reconnection, typed message handlers and a simple API for
+ * subscribing to messages by type. Designed to be used by the
+ * front-end to receive realtime events from the backend WS server.
+ */
+
 import {
     WSMessage
 } from '@/types/api'
@@ -24,6 +33,11 @@ class WebSocketClient {
         this.url = url
     }
 
+    /**
+     * Connect opens a WebSocket and resolves when the connection is
+     * established. `token` is attached as a query parameter and used by
+     * the server for authentication; `inspectionId` scopes the connection.
+     */
     connect(token: string, inspectionId: string): Promise<void> {
         return new Promise((resolve, reject) => {
             this.token = token

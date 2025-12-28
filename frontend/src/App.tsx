@@ -18,13 +18,20 @@ import InspectionListPage from './pages/InspectionListPage'
 import LoginPage from './pages/LoginPage'
 import RemoteInspectionPage from './pages/RemoteInspectionPage'
 
+/**
+ * Top-level application component. Responsible for reading any stored
+ * authentication (or guest session) tokens, initializing the `apiClient`
+ * with a token, and rendering the appropriate routes based on user
+ * authentication state.
+ */
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [guestMode, setGuestMode] = useState(false)
 
     useEffect(() => {
-        // Check if user is already logged in
+        // On mount, check localStorage for an auth token and attempt to
+        // load the user profile. If the token is invalid, remove it.
         const token = localStorage.getItem('authToken')
         if (token) {
             apiClient.setToken(token)
@@ -37,7 +44,8 @@ const App: React.FC = () => {
                 })
                 .finally(() => setLoading(false))
         } else {
-            // Check for guest mode
+            // If no auth token, check for a guest session token and set
+            // a minimal guest user context.
             const guestToken = localStorage.getItem('guestSessionToken')
             if (guestToken) {
                 apiClient.setToken(guestToken)
